@@ -1,20 +1,12 @@
-import matplotlib.pyplot as plt
 import wandb
-import os
-from os import path
 from typing import *
-from tqdm.auto import tqdm
+from tqdm.autonotebook import tqdm
 from random import randint, random, choice, choices
 
 import numpy as np
 import torch
-from torch import nn
 from torch import optim
-from torch.utils.data import DataLoader, Dataset, random_split
-from torchvision import datasets
-from torchvision import transforms as tt
-from torchvision.utils import make_grid
-from skimage import io
+from torch.utils.data import DataLoader
 
 from src.config import ACTIVATION_FUNCTIONS, DEVICE, BEST_MODEL_PATH, CONV_FEATURES, KERNEL_SIZES, USE_CONV, \
     LINEAR_FEATURES, LATENT_SIZE, WANDB_LOGIN
@@ -134,6 +126,8 @@ class Individual:
 
         # fix restriction 2 via removing increasing sequences
         rule_2_x = [rule_1_x[0], rule_1_x[1]]
+
+        max_features = rule_1_x[1].features
         min_features = rule_1_x[1].features
         for i in range(2, len(rule_1_x)):
             current_features = rule_1_x[i].features
@@ -142,8 +136,11 @@ class Individual:
                 rule_2_x.append(rule_1_x[i])
                 continue
 
-            if min_features >= current_features:
+            if rule_1_x[i].layer_type == 'f' and min_features >= current_features:
                 min_features = current_features
+                rule_2_x.append(rule_1_x[i])
+            elif rule_1_x[i].layer_type == 'c' and max_features <= current_features:
+                max_features = current_features
                 rule_2_x.append(rule_1_x[i])
 
         rule_3_x = [rule_2_x[0]]
@@ -348,7 +345,7 @@ class GeneticAlgorithm:
                  valid_dataset,
                  batch_size=8):
         self.batch_size = batch_size
-        self.train_loader = DataLoader(train_dataset, batch_size, shuffle=True)
+        self.train_loader = DataLoader(train_dataset, batch_size, shuffle=True, drop_last=True)
         self.valid_loader = DataLoader(valid_dataset, batch_size, shuffle=False)
         self.img_shape = train_dataset[0].shape
 

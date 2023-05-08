@@ -1,5 +1,4 @@
 import wandb
-import os
 from torch.utils.data import random_split
 from torch import Generator
 
