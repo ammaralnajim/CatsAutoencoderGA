@@ -3,6 +3,14 @@ from torch import nn
 
 class ConvLayer(nn.Module):
     def __init__(self, fin, fout, kernel_size, activation):
+        """
+        Convolutional layer constructor
+
+        :param fin: number of input feature maps
+        :param fout: number of output feature maps
+        :param kernel_size:
+        :param activation: type of activation function
+        """
         super().__init__()
         padding = kernel_size // 2
         layers = [
@@ -34,6 +42,14 @@ class ConvLayer(nn.Module):
 
 class ConvTransposeLayer(nn.Module):
     def __init__(self, fin, fout, kernel_size, activation):
+        """
+        Upsample constructor for decoder part
+
+        :param fin: number of input feature maps
+        :param fout: number of output feature maps
+        :param kernel_size:
+        :param activation: type of activation function
+        """
         super().__init__()
         layers = [
             nn.Upsample(scale_factor=2),
@@ -65,6 +81,15 @@ class ConvTransposeLayer(nn.Module):
 
 class LinearLayer(nn.Module):
     def __init__(self, fin, fout, activation, flatten=False, unflatten=None):
+        """
+        Constructor for linear layer
+
+        :param fin: number of features in
+        :param fout: number of features out
+        :param activation: type of activation function
+        :param flatten: whether apply flatten or not
+        :param unflatten: None means no unflatten, (C, H, W) will unflatten to specified shape
+        """
         super().__init__()
         self.unflatten = unflatten
 
@@ -100,6 +125,11 @@ class LinearLayer(nn.Module):
 
 class Autoencoder(nn.Module):
     def __init__(self, encoder, decoder):
+        """
+        Autoencoder
+        :param encoder: list of modules for encoder part
+        :param decoder: symmetric list of modules for decoder part
+        """
         super().__init__()
         self.encoder = nn.Sequential(*encoder)
         self.decoder = nn.Sequential(*decoder)

@@ -1,6 +1,6 @@
 import wandb
 from typing import *
-from tqdm.autonotebook import tqdm
+from tqdm.auto import tqdm
 from random import randint, random, choice, choices
 
 import numpy as np
@@ -8,6 +8,7 @@ import torch
 from torch import optim
 from torch.utils.data import DataLoader
 
+from config import ATTEMPTS_INDIVIDUAL
 from src.config import ACTIVATION_FUNCTIONS, DEVICE, BEST_MODEL_PATH, CONV_FEATURES, KERNEL_SIZES, USE_CONV, \
     LINEAR_FEATURES, LATENT_SIZE, WANDB_LOGIN
 from src.autoencoder import *
@@ -16,6 +17,13 @@ from src.utils import visualize_collection
 
 class Gene:
     def __init__(self, layer_type: str, features: int = None, kernel_size: int = None):
+        """
+        Class for easier work with chosen representation
+
+        :param layer_type: 'f' for linear (fully connected), 'c' for convolutional, any from ACTIVATION_FUNCTIONS for activation funtion
+        :param features: number of features outputted by layer
+        :param kernel_size: used and specified for convolutions only
+        """
         self.layer_type = layer_type
         self.features = features
         self.kernel_size = kernel_size
@@ -38,6 +46,12 @@ class Gene:
 
 class Individual:
     def __init__(self, parent, chromosomes: List[Gene] = None):
+        """
+        Representation of the individual in population
+
+        :param parent: Genetic Algorithm acts as an environment for individual to act on
+        :param chromosomes: List of genes representing this individual if None then random individual is created
+        """
         self.parent = parent
         self.fitness = None
         if chromosomes is None:
@@ -57,12 +71,14 @@ class Individual:
             self.chromosomes = chromosomes.copy()
 
     def get_fitness(self, epochs):
-        if self.fitness is not None:
-            return self.fitness
+        if self.fitness is None:
+            scores = []
+            for _ in range(ATTEMPTS_INDIVIDUAL):
+                _, score = self.fit_autoencoder(epochs)
+                scores.append(score)
+            self.fitness = max(scores)
 
-        _, score = self.fit_autoencoder(epochs)
-        self.fitness = score
-        return score
+        return self.fitness
 
     def mutation(self, x: List[Gene]):
         """
@@ -169,6 +185,11 @@ class Individual:
         return Individual(self.parent, self.mutation(child1)), Individual(self.parent, self.mutation(child2))
 
     def create_model(self) -> nn.Module:
+        """
+        implements algorithm for creating trainable model from specified genome
+        :return: nn.Module autoencoder for further training
+        """
+
         encoder = []
         decoder = []
         activation = self.chromosomes[0].layer_type.lower()
@@ -225,6 +246,15 @@ class Individual:
         return Autoencoder(encoder, decoder)
 
     def fit_epoch(self, model, criterion, optimizer, scheduler):
+        """
+        traning part of training loop
+
+        :param model: model
+        :param criterion: loss function
+        :param optimizer:
+        :param scheduler:
+        :return: averaged training loss
+        """
         model.train()
         running_loss = 0.0
 
@@ -247,6 +277,13 @@ class Individual:
         return train_loss
 
     def eval_epoch(self, model, criterion):
+        """
+        validation part of training loop
+
+        :param model: model
+        :param criterion: loss function
+        :return: averaged loss on validation set
+        """
         model.eval()
         running_loss = 0.0
 
@@ -262,6 +299,18 @@ class Individual:
         return valid_loss
 
     def train(self, model, criterion, optimizer, scheduler, epochs=50, patience=10, verbose=True):
+        """
+        training loop
+
+        :param model: model
+        :param criterion: loss function
+        :param optimizer:
+        :param scheduler:
+        :param epochs: number of epochs
+        :param patience:
+        :param verbose: whether to output messages and progress bars
+        :return: best model and best validation score (loss)
+        """
         best_score = np.inf
 
         if not verbose:
@@ -291,6 +340,10 @@ class Individual:
         return model, best_score
 
     def get_latent_dist(self, model):
+        """
+        :param model:
+        :return: latent distribution of encoder output for given model
+        """
         model.eval()
 
         latent_vectors = None
@@ -306,14 +359,25 @@ class Individual:
         return torch.mean(latent_vectors, dim=0), torch.std(latent_vectors, dim=0)
 
     def fit_autoencoder(self, epochs):
+        """
+        trains autoencoder when genetic algorithm in the train phase
+        :param epochs:
+        :return: best model and best score
+        """
         model = self.create_model()
         criterion = nn.MSELoss()
-        optimizer = optim.AdamW(model.parameters(), lr=5e-4)
+        optimizer = optim.AdamW(model.parameters(), lr=1e-3)
+        scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, epochs, 1e-5)
         model.to(DEVICE)
-        model, best_score = self.train(model, criterion, optimizer, None, epochs, -1)
+        model, best_score = self.train(model, criterion, optimizer, scheduler, epochs, -1)
         return model.to('cpu'), best_score
 
     def fit_long(self, epochs):
+        """
+        trains best individual after genetic algorithm is finished
+        :param epochs:
+        :return: best model and best score
+        """
         model = self.create_model()
         criterion = nn.MSELoss()
         optimizer = optim.AdamW(model.parameters(), lr=1e-3)
@@ -323,6 +387,13 @@ class Individual:
         return model.to('cpu'), best_score
 
     def visualize(self, epochs, n=16):
+        """
+        Visualizes generation capabilities of individual
+
+        :param epochs:
+        :param n: number of output images for correct work make it square of natural number
+        :return:
+        """
         model, best_score = self.fit_long(epochs)
         means, stds = self.get_latent_dist(model.to(DEVICE))
         model.eval()
@@ -344,6 +415,12 @@ class GeneticAlgorithm:
                  train_dataset,
                  valid_dataset,
                  batch_size=8):
+        """
+        Whole class dedicated to encapsulate logic of training genetic algorithm for given task
+        :param train_dataset:
+        :param valid_dataset:
+        :param batch_size:
+        """
         self.batch_size = batch_size
         self.train_loader = DataLoader(train_dataset, batch_size, shuffle=True, drop_last=True)
         self.valid_loader = DataLoader(valid_dataset, batch_size, shuffle=False)
@@ -356,6 +433,14 @@ class GeneticAlgorithm:
             img_size //= 2
 
     def train_ga(self, n_pop: int, p_new: float, epochs, epochs_per_model):
+        """
+        Main loop of genetic algorithm
+        :param n_pop: number of initial population
+        :param p_new: share of 'children' created at each step that will replace old ones
+        :param epochs: number of iterations of genetic algorithm
+        :param epochs_per_model: number of iterations per individual
+        :return:
+        """
         if WANDB_LOGIN:
             wandb.init(
                 project="ga-autoencoders-cats",
