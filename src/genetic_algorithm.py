@@ -8,9 +8,8 @@ import torch
 from torch import optim
 from torch.utils.data import DataLoader
 
-from config import ATTEMPTS_INDIVIDUAL
 from src.config import ACTIVATION_FUNCTIONS, DEVICE, BEST_MODEL_PATH, CONV_FEATURES, KERNEL_SIZES, USE_CONV, \
-    LINEAR_FEATURES, LATENT_SIZE, WANDB_LOGIN
+    LINEAR_FEATURES, LATENT_SIZE, WANDB_LOGIN, ATTEMPTS_INDIVIDUAL
 from src.autoencoder import *
 from src.utils import visualize_collection
 
@@ -73,9 +72,10 @@ class Individual:
     def get_fitness(self, epochs):
         if self.fitness is None:
             scores = []
-            for _ in range(ATTEMPTS_INDIVIDUAL):
+            for attempt in range(ATTEMPTS_INDIVIDUAL):
                 _, score = self.fit_autoencoder(epochs)
                 scores.append(score)
+                print(f"{str(self)}: Attempt #{attempt + 1}: score = {score}")
             self.fitness = max(scores)
 
         return self.fitness
@@ -313,12 +313,7 @@ class Individual:
         """
         best_score = np.inf
 
-        if not verbose:
-            pbar = range(epochs)
-        else:
-            pbar = tqdm(list(range(epochs)), desc=str(self.chromosomes))
-
-        for epoch in pbar:
+        for epoch in range(epochs):
             train_loss = self.fit_epoch(model, criterion, optimizer, scheduler)
 
             valid_loss = self.eval_epoch(model, criterion)
@@ -333,7 +328,6 @@ class Individual:
                 if verbose:
                     print("Early stopping!")
                 break
-            pbar.set_postfix_str(f"Train loss: {train_loss}, Validation loss: {valid_loss}")
 
         model.load_state_dict(torch.load(BEST_MODEL_PATH))
 
@@ -467,7 +461,7 @@ class GeneticAlgorithm:
         if WANDB_LOGIN:
             wandb.log({"best_score": best_fitness})
 
-        pbar = tqdm(list(range(epochs)), desc='Genetic algorithm')
+        pbar = tqdm(list(range(epochs)), desc='Genetic algorithm', leave=True)
         for _ in pbar:
             best_pops = population[-n_children // 2:]
             candidate_pops = population[-n_children:]
