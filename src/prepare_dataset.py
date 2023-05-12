@@ -3,6 +3,7 @@ from os import path
 import torch
 from torch.utils.data import Dataset
 from skimage import io
+from tqdm.auto import tqdm
 
 from src.config import DATASET_PATH, TRANSFORM
 
@@ -18,7 +19,7 @@ class ImageDatasetLoaded(Dataset):
         :param transform: trnsforms to apply for each image
         """
         self.images = torch.concat(
-            [resolve_tensor(fname, transform) for fname in os.listdir(root) if
+            [resolve_tensor(fname, transform) for fname in tqdm(os.listdir(root)) if
              path.isfile(path.join(root, fname))], dim=0)
 
     def __getitem__(self, index):
@@ -61,8 +62,6 @@ def resolve_tensor(fname, transform):
 
 def get_dataset(load_to_memory=False):
     if load_to_memory:
-        dataset = ImageDatasetLoaded(DATASET_PATH, TRANSFORM)
-    else:
-        dataset = ImageDatasetNotLoaded(DATASET_PATH, TRANSFORM)
+        return ImageDatasetLoaded(DATASET_PATH, TRANSFORM)
 
-    return dataset
+    return ImageDatasetNotLoaded(DATASET_PATH, TRANSFORM)
