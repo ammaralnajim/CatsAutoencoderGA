@@ -9,7 +9,8 @@ from torch import optim
 from torch.utils.data import DataLoader
 
 from src.config import ACTIVATION_FUNCTIONS, DEVICE, BEST_MODEL_PATH, CONV_FEATURES, KERNEL_SIZES, USE_CONV, \
-    LINEAR_FEATURES, LATENT_SIZE, WANDB_LOGIN, ATTEMPTS_INDIVIDUAL
+    LINEAR_FEATURES, LATENT_SIZE, WANDB_LOGIN, ATTEMPTS_INDIVIDUAL, ADD_NOISE, ROOT_N_IMAGES, GENERATED_PATH, \
+    TRUE_PATH, RECS_PATH
 from src.autoencoder import *
 from src.utils import visualize_collection
 
@@ -262,7 +263,12 @@ class Individual:
             inputs = inputs.to(DEVICE)
             optimizer.zero_grad()
 
-            latent_vector, reconstruction = model(inputs)
+            if ADD_NOISE:
+                noise = torch.rand_like(inputs) * 0.1 - 0.05
+                noise = noise.to(DEVICE)
+                latent_vector, reconstruction = model(inputs + noise)
+            else:
+                latent_vector, reconstruction = model(inputs)
 
             loss = criterion(reconstruction, inputs)
             loss.backward()
@@ -341,16 +347,24 @@ class Individual:
         model.eval()
 
         latent_vectors = None
+        eval_true = None
+        eval_recs = None
         for inputs in self.parent.train_loader:
             inputs = inputs.to(DEVICE)
             with torch.set_grad_enabled(False):
                 latent_vector = model.encoder(inputs).cpu().detach()
+
                 if latent_vectors is None:
                     latent_vectors = latent_vector
+                    eval_true = inputs
+                    eval_recs = model.decoder(latent_vector).cpu().detach()
                 else:
                     latent_vectors = torch.concat((latent_vectors, latent_vector), dim=0)
+                    eval_true = torch.concat((eval_true, inputs), dim=0)
+                    eval_recs = torch.concat((eval_recs, model.decoder(latent_vector).cpu().detach()), dim=0)
 
-        return torch.mean(latent_vectors, dim=0), torch.std(latent_vectors, dim=0)
+
+        return torch.mean(latent_vectors, dim=0), torch.std(latent_vectors, dim=0), eval_true, eval_recs
 
     def fit_autoencoder(self, epochs):
         """
@@ -380,7 +394,7 @@ class Individual:
         model, best_score = self.train(model, criterion, optimizer, scheduler, epochs, epochs // 2)
         return model.to('cpu'), best_score
 
-    def visualize(self, epochs, n=16):
+    def visualize(self, epochs):
         """
         Visualizes generation capabilities of individual
 
@@ -389,13 +403,16 @@ class Individual:
         :return:
         """
         model, best_score = self.fit_long(epochs)
-        means, stds = self.get_latent_dist(model.to(DEVICE))
+        means, stds, eval_true, eval_recs = self.get_latent_dist(model.to(DEVICE))
+        latent_batch = torch.concat([torch.normal(means, stds).unsqueeze(0) for _ in range(ROOT_N_IMAGES ** 2)], dim=0).to(DEVICE)
+
         model.eval()
-        latent_batch = torch.concat([torch.normal(means, stds).unsqueeze(0) for _ in range(n)], dim=0).to(DEVICE)
         recs = model.decoder(latent_batch)
         model.to('cpu')
 
-        visualize_collection(recs, n)
+        visualize_collection(recs, GENERATED_PATH)
+        visualize_collection(eval_true[:ROOT_N_IMAGES ** 2], TRUE_PATH)
+        visualize_collection(eval_recs[:ROOT_N_IMAGES ** 2], RECS_PATH)
 
     def __str__(self):
         return str(self.chromosomes)
@@ -461,7 +478,7 @@ class GeneticAlgorithm:
         if WANDB_LOGIN:
             wandb.log({"best_score": best_fitness})
 
-        pbar = tqdm(list(range(epochs)), desc='Genetic algorithm', leave=True)
+        pbar = tqdm(list(range(epochs)), desc='Genetic algorithm')
         for _ in pbar:
             best_pops = population[-n_children // 2:]
             candidate_pops = population[-n_children:]
@@ -479,7 +496,7 @@ class GeneticAlgorithm:
                 best_fitness = population[-1].get_fitness(epochs_per_model)
                 best_fit = population[-1]
 
-            pbar.set_postfix_str(f'Best score: {best_fitness}, Best_individual: {best_fit}')
+            pbar.set_postfix_str(f'Best score: {best_fitness}, Best_individual: {best_fit}\n')
             if WANDB_LOGIN:
                 wandb.log({"best_score": best_fitness})
         if WANDB_LOGIN:
