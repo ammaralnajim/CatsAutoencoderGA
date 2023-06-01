@@ -352,16 +352,16 @@ class Individual:
         for inputs in self.parent.train_loader:
             inputs = inputs.to(DEVICE)
             with torch.set_grad_enabled(False):
-                latent_vector = model.encoder(inputs).cpu().detach()
+                latent_vector = model.encoder(inputs)
 
                 if latent_vectors is None:
-                    latent_vectors = latent_vector
-                    eval_true = inputs
                     eval_recs = model.decoder(latent_vector).cpu().detach()
+                    latent_vectors = latent_vector.cpu().detach()
+                    eval_true = inputs.cpu().detach()
                 else:
-                    latent_vectors = torch.concat((latent_vectors, latent_vector), dim=0)
-                    eval_true = torch.concat((eval_true, inputs), dim=0)
                     eval_recs = torch.concat((eval_recs, model.decoder(latent_vector).cpu().detach()), dim=0)
+                    latent_vectors = torch.concat((latent_vectors, latent_vector.cpu().detach()), dim=0)
+                    eval_true = torch.concat((eval_true, inputs.cpu().detach()), dim=0)
 
 
         return torch.mean(latent_vectors, dim=0), torch.std(latent_vectors, dim=0), eval_true, eval_recs

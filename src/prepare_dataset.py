@@ -18,12 +18,12 @@ class ImageDatasetLoaded(Dataset):
         :param root: root directory
         :param transform: trnsforms to apply for each image
         """
-        self.images = torch.concat(
-            [resolve_tensor(fname, transform) for fname in tqdm(os.listdir(root)) if
-             path.isfile(path.join(root, fname))], dim=0)
+        self.images = [io.imread(path.join(DATASET_PATH, fname)) for fname in tqdm(os.listdir(root)) if
+                       path.isfile(path.join(root, fname))]
+        self.transform = transform
 
     def __getitem__(self, index):
-        return self.images[index]
+        return self.transform(self.images[index])
 
     def __len__(self):
         return len(self.images)
@@ -47,17 +47,6 @@ class ImageDatasetNotLoaded(Dataset):
 
     def __len__(self):
         return len(self.fnames)
-
-
-def resolve_tensor(fname, transform):
-    """
-    Helper function for applying transforms when we load dataset to memory
-
-    :param fname: filename
-    :param transform: applied transforms
-    :return: transformed tensor in the shape of [1, C, H, W]
-    """
-    return transform(io.imread(path.join(DATASET_PATH, fname))).unsqueeze(0)
 
 
 def get_dataset(load_to_memory=False):
