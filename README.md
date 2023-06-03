@@ -26,7 +26,7 @@ After installation you may want to change [config file](src/config.py)
 
 Important step is to verify that all PATH variables have existing directories
 
-More detailed explaination of cofig varaibles located at the [footer](#configuration-details)
+More detailed explanation of config varaibles located at the [footer](#configuration-details)
 
 ## Run
 After you configured everything you can run training with:
