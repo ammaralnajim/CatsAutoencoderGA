@@ -3,6 +3,8 @@ My own interpretation of Nature Inspired Computing final project at Innopolis Un
 
 Here you can find project [article](https://drive.google.com/file/d/13g3zIlCQYJ6vfD-62MEhq0lYbYSEyAOm/view) and original [repository](https://github.com/KGallyamov/NIC-project), which you can address for more information
 
+Config file and artifacts in [results](results) folder are created with the most recent run
+
 ## Installation
 ### Python
 You need [Python 3.9](https://www.python.org/downloads/) or above for proper work
