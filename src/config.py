@@ -1,9 +1,9 @@
 from torchvision import transforms as tt
 
-WANDB_LOGIN = True
+WANDB_LOGIN = False
 
 # dataset preprocessing configs
-LOAD_IN_MEMORY = True
+LOAD_IN_MEMORY = False
 DATASET_PATH = "./cats/cats"
 DEVICE = 'cuda'
 TRANSFORM = tt.Compose([
@@ -16,11 +16,11 @@ TRAIN_PORTION = 8192  # either float as portion or integer as number of objects
 VALIDATION_PORTION = 2048  # either float as portion or integer as number of objects
 BATCH_SIZE = 16
 ADD_NOISE = True
-N_POPULATION = 64
+N_POPULATION = 32
 P_CHILDREN = 0.5
 EPOCHS_GA = 10
-ATTEMPTS_INDIVIDUAL = 2
-EPOCHS_INDIVIDUAL = 2
+ATTEMPTS_INDIVIDUAL = 1
+EPOCHS_INDIVIDUAL = 5
 
 EPOCHS_BEST = 100
 
